@@ -1,0 +1,10 @@
+node_modules
+.next
+.env*
+*.tsbuildinfo
+
+# Local development databases can contain sensitive data; never commit them.
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*

@@ -1,0 +1,294 @@
+-- LOCAL DRAFT: do not deploy. Not a runnable migration until security and real
+-- workflow roles are reviewed and integration tests pass in dedicated dev.
+-- By design all operational tables have RLS enabled and no grants/policies.
+create table public.os_company (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  created_at timestamptz not null default now()
+);
+create table public.os_membership (
+  company_id uuid not null references public.os_company(id),
+  user_id uuid not null references auth.users(id),
+  role text not null check (role in ('executive','talent_ops','finance','partner')),
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  primary key(company_id,user_id,role)
+);
+create table public.os_user_settings (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  theme text not null default 'dark' check (theme in ('dark','light')),
+  updated_at timestamptz not null default now()
+);
+create table public.os_partner (
+  company_id uuid not null references public.os_company(id),
+  id uuid not null default gen_random_uuid(),
+  name text not null,
+  primary key(company_id,id)
+);
+create table public.os_legal_entity (
+  company_id uuid not null references public.os_company(id),
+  id uuid not null default gen_random_uuid(),
+  name text not null,
+  primary key(company_id,id)
+);
+create table public.os_partner_entity (
+  company_id uuid not null,
+  partner_id uuid not null,
+  legal_entity_id uuid not null,
+  primary key(company_id,partner_id,legal_entity_id),
+  foreign key(company_id,partner_id) references public.os_partner(company_id,id),
+  foreign key(company_id,legal_entity_id) references public.os_legal_entity(company_id,id)
+);
+create table public.os_agreement (
+  company_id uuid not null,
+  id uuid not null default gen_random_uuid(),
+  partner_id uuid not null,
+  legal_entity_id uuid not null,
+  primary key(company_id,id),
+  unique(company_id,id,partner_id),
+  foreign key(company_id,partner_id,legal_entity_id) references public.os_partner_entity(company_id,partner_id,legal_entity_id)
+);
+create table public.os_agreement_version (
+  company_id uuid not null,
+  id uuid not null default gen_random_uuid(),
+  agreement_id uuid not null,
+  label text not null,
+  execution_state text not null default 'unverified',
+  created_at timestamptz not null default now(),
+  primary key(company_id,id),
+  unique(company_id,id,agreement_id),
+  foreign key(company_id,agreement_id) references public.os_agreement(company_id,id)
+);
+create table public.os_requirement (
+  company_id uuid not null,
+  id uuid not null default gen_random_uuid(),
+  partner_id uuid not null,
+  agreement_id uuid not null,
+  agreement_version_id uuid not null,
+  title text not null,
+  owner_user_id uuid references auth.users(id),
+  status text not null default 'draft',
+  created_at timestamptz not null default now(),
+  primary key(company_id,id),
+  unique(company_id,id,agreement_id,agreement_version_id),
+  foreign key(company_id,agreement_id,partner_id) references public.os_agreement(company_id,id,partner_id),
+  foreign key(company_id,agreement_version_id,agreement_id) references public.os_agreement_version(company_id,id,agreement_id)
+);
+create table public.os_candidate (
+  company_id uuid not null references public.os_company(id),
+  id uuid not null default gen_random_uuid(),
+  display_name text not null,
+  created_at timestamptz not null default now(),
+  primary key(company_id,id)
+);
+create table public.os_consideration (
+  company_id uuid not null,
+  id uuid not null default gen_random_uuid(),
+  requirement_id uuid not null,
+  candidate_id uuid not null,
+  attempt_no integer not null default 1 check(attempt_no>0),
+  stage text not null default 'new',
+  created_at timestamptz not null default now(),
+  primary key(company_id,id),
+  unique(company_id,candidate_id,requirement_id,attempt_no),
+  unique(company_id,id,requirement_id),
+  foreign key(company_id,requirement_id) references public.os_requirement(company_id,id),
+  foreign key(company_id,candidate_id) references public.os_candidate(company_id,id)
+);
+create table public.os_introduction (
+  company_id uuid not null,
+  id uuid not null default gen_random_uuid(),
+  consideration_id uuid not null,
+  released_at timestamptz,
+  evidence text,
+  primary key(company_id,id),
+  foreign key(company_id,consideration_id) references public.os_consideration(company_id,id)
+);
+create table public.os_interview (
+  company_id uuid not null,
+  id uuid not null default gen_random_uuid(),
+  introduction_id uuid not null,
+  scheduled_at timestamptz,
+  status text not null,
+  primary key(company_id,id),
+  foreign key(company_id,introduction_id) references public.os_introduction(company_id,id)
+);
+create table public.os_placement (
+  company_id uuid not null,
+  id uuid not null default gen_random_uuid(),
+  consideration_id uuid not null,
+  requirement_id uuid not null,
+  agreement_id uuid not null,
+  agreement_version_id uuid not null,
+  actual_joining_date date,
+  evidence text,
+  primary key(company_id,id),
+  unique(company_id,id,agreement_version_id),
+  foreign key(company_id,consideration_id,requirement_id) references public.os_consideration(company_id,id,requirement_id),
+  foreign key(company_id,requirement_id,agreement_id,agreement_version_id) references public.os_requirement(company_id,id,agreement_id,agreement_version_id)
+);
+create table public.os_action (
+  company_id uuid not null references public.os_company(id),
+  id uuid not null default gen_random_uuid(),
+  subject_type text not null,
+  subject_id uuid not null,
+  action_type text not null,
+  owner_user_id uuid not null references auth.users(id),
+  status text not null default 'open' check(status in ('open','completed')),
+  review_date date not null,
+  next_action text not null,
+  evidence text,
+  updated_at timestamptz not null default now(),
+  primary key(company_id,id)
+);
+create table public.os_action_event (
+  company_id uuid not null,
+  id uuid not null default gen_random_uuid(),
+  action_id uuid not null,
+  event_type text not null check(event_type in ('created','assigned','completed','reopened')),
+  actor_user_id uuid not null references auth.users(id),
+  occurred_at timestamptz not null default now(),
+  detail text,
+  primary key(company_id,id),
+  foreign key(company_id,action_id) references public.os_action(company_id,id)
+);
+create table public.os_outcome_assertion (
+  company_id uuid not null references public.os_company(id),
+  id uuid not null default gen_random_uuid(),
+  subject_type text not null check(subject_type in ('consideration','placement')),
+  subject_id uuid not null,
+  outcome text not null,
+  reason_code text not null default 'unknown',
+  context text,
+  evidence text,
+  reported_by text,
+  recorded_by uuid not null references auth.users(id),
+  certainty text not null default 'unknown' check(certainty in ('confirmed','reported','disputed','unknown')),
+  next_action text,
+  end_date date,
+  replacement_review_status text,
+  supersedes_id uuid,
+  recorded_at timestamptz not null default now(),
+  primary key(company_id,id),
+  foreign key(company_id,supersedes_id) references public.os_outcome_assertion(company_id,id)
+);
+create table public.os_fee_entitlement (
+  company_id uuid not null,
+  id uuid not null default gen_random_uuid(),
+  placement_id uuid not null,
+  agreement_version_id uuid not null,
+  currency char(3) not null check(currency ~ '^[A-Z]{3}$'),
+  estimated_minor bigint not null default 0 check(estimated_minor>=0),
+  earned_minor bigint not null default 0 check(earned_minor>=0),
+  primary key(company_id,id),
+  unique(company_id,id,agreement_version_id),
+  foreign key(company_id,placement_id,agreement_version_id) references public.os_placement(company_id,id,agreement_version_id)
+);
+create table public.os_invoice (
+  company_id uuid not null,
+  id uuid not null default gen_random_uuid(),
+  partner_id uuid not null,
+  agreement_id uuid not null,
+  agreement_version_id uuid not null,
+  number text not null,
+  gross_minor bigint not null check(gross_minor>0),
+  currency char(3) not null check(currency ~ '^[A-Z]{3}$'),
+  due_date date,
+  primary key(company_id,id),
+  unique(company_id,number),
+  unique(company_id,id,agreement_version_id),
+  foreign key(company_id,agreement_id,partner_id) references public.os_agreement(company_id,id,partner_id),
+  foreign key(company_id,agreement_version_id,agreement_id) references public.os_agreement_version(company_id,id,agreement_id)
+);
+create table public.os_invoice_line (
+  company_id uuid not null,
+  id uuid not null default gen_random_uuid(),
+  invoice_id uuid not null,
+  entitlement_id uuid not null,
+  agreement_version_id uuid not null,
+  gross_minor bigint not null check(gross_minor>0),
+  primary key(company_id,id),
+  foreign key(company_id,invoice_id,agreement_version_id) references public.os_invoice(company_id,id,agreement_version_id),
+  foreign key(company_id,entitlement_id,agreement_version_id) references public.os_fee_entitlement(company_id,id,agreement_version_id)
+);
+create table public.os_receipt (
+  company_id uuid not null references public.os_company(id),
+  id uuid not null default gen_random_uuid(),
+  reference text not null,
+  received_on date not null,
+  amount_minor bigint not null check(amount_minor>0),
+  currency char(3) not null check(currency ~ '^[A-Z]{3}$'),
+  primary key(company_id,id),
+  unique(company_id,reference,received_on,amount_minor,currency)
+);
+create table public.os_allocation (
+  company_id uuid not null,
+  id uuid not null default gen_random_uuid(),
+  receipt_id uuid not null,
+  invoice_id uuid not null,
+  amount_minor bigint not null check(amount_minor>0),
+  idempotency_key text not null,
+  recorded_by uuid not null references auth.users(id),
+  recorded_at timestamptz not null default now(),
+  primary key(company_id,id),
+  unique(company_id,idempotency_key),
+  foreign key(company_id,receipt_id) references public.os_receipt(company_id,id),
+  foreign key(company_id,invoice_id) references public.os_invoice(company_id,id)
+);
+create table public.os_allocation_reversal (
+  company_id uuid not null,
+  id uuid not null default gen_random_uuid(),
+  allocation_id uuid not null,
+  reason text not null,
+  recorded_by uuid not null references auth.users(id),
+  recorded_at timestamptz not null default now(),
+  primary key(company_id,id),
+  unique(company_id,allocation_id),
+  foreign key(company_id,allocation_id) references public.os_allocation(company_id,id)
+);
+create table public.os_invoice_adjustment_draft (
+  company_id uuid not null,
+  id uuid not null default gen_random_uuid(),
+  invoice_id uuid not null,
+  amount_minor bigint not null,
+  reason text not null,
+  recorded_by uuid not null references auth.users(id),
+  recorded_at timestamptz not null default now(),
+  primary key(company_id,id),
+  foreign key(company_id,invoice_id) references public.os_invoice(company_id,id)
+);
+create table public.os_audit_event (
+  company_id uuid not null references public.os_company(id),
+  id uuid not null default gen_random_uuid(),
+  actor_user_id uuid not null references auth.users(id),
+  action text not null,
+  subject_id uuid not null,
+  recorded_at timestamptz not null default now(),
+  primary key(company_id,id)
+);
+-- Explicit default deny. Policies, field-level protections and transactional
+-- operations require review and test before any operational access is granted.
+do $$ declare n text; begin
+  foreach n in array array['os_company','os_membership','os_user_settings','os_partner','os_legal_entity','os_partner_entity','os_agreement','os_agreement_version','os_requirement','os_candidate','os_consideration','os_introduction','os_interview','os_placement','os_action','os_action_event','os_outcome_assertion','os_fee_entitlement','os_invoice','os_invoice_line','os_receipt','os_allocation','os_allocation_reversal','os_invoice_adjustment_draft','os_audit_event'] loop
+    execute format('alter table public.%I enable row level security',n);
+    execute format('revoke all on table public.%I from public, anon, authenticated',n);
+  end loop;
+end $$;
+-- Memberships are readable only by the member; only privileged provisioning
+-- can create or change them. They do not grant operational table access.
+grant select on public.os_membership to authenticated;
+create policy own_membership_select on public.os_membership for select to authenticated using ((select auth.uid())=user_id);
+-- Settings require an active Talent Ops or partner membership. This is a
+-- personal preference only and does not grant workspace or record access.
+grant select,insert,update on public.os_user_settings to authenticated;
+create policy own_settings_select on public.os_user_settings for select to authenticated using (
+  (select auth.uid())=user_id and exists (select 1 from public.os_membership m where m.user_id=(select auth.uid()) and m.active and m.role in ('talent_ops','partner'))
+);
+create policy own_settings_insert on public.os_user_settings for insert to authenticated with check (
+  (select auth.uid())=user_id and exists (select 1 from public.os_membership m where m.user_id=(select auth.uid()) and m.active and m.role in ('talent_ops','partner'))
+);
+create policy own_settings_update on public.os_user_settings for update to authenticated using (
+  (select auth.uid())=user_id and exists (select 1 from public.os_membership m where m.user_id=(select auth.uid()) and m.active and m.role in ('talent_ops','partner'))
+) with check (
+  (select auth.uid())=user_id and exists (select 1 from public.os_membership m where m.user_id=(select auth.uid()) and m.active and m.role in ('talent_ops','partner'))
+);
