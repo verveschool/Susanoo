@@ -6,3 +6,5 @@ body{font-size:16px;line-height:1.55}.brand{font-weight:600;letter-spacing:-.35p
 .executive-overview{position:relative;isolation:isolate}.executive-overview::before{content:"";position:absolute;z-index:-1;pointer-events:none;inset:65px 0 auto;height:440px;background:linear-gradient(90deg,#07070a 15%,transparent 55%,#07070a 90%),linear-gradient(180deg,transparent 35%,#07070a 100%),url('/susanoo-reference.png') 70% top / auto 440px no-repeat;opacity:.12;mask-image:linear-gradient(to bottom,transparent,#000 20%,#000 65%,transparent)}@media(max-width:700px){.executive-overview::before{inset:70px 0 auto;height:280px;background-size:auto,auto,auto 280px;background-position:center,center,65% top;opacity:.09}}
 
 .sidebar nav{margin-top:32px}footer strong{margin-left:auto;text-align:right}@media(max-width:700px){footer strong{margin-left:0;text-align:left}}
+
+@media(min-width:701px){.body{display:flex;flex-direction:column;min-height:100vh}.body>main{width:100%;flex:1;display:flex;flex-direction:column}.body>main>footer{margin-top:auto;position:relative;top:0}.body>main>footer::before{content:"";position:absolute;bottom:100%;height:46px;pointer-events:none}}
