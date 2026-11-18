@@ -362,3 +362,21 @@ main > :nth-last-child(2) { margin-bottom: 32px; }
   .table-wrap td.empty { display: block; }
   .table-wrap td.empty::before { display: none; }
 }
+
+.field textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: 8px 12px;
+  border: 1px solid var(--verve-control-border);
+  border-radius: var(--verve-radius);
+  background: var(--verve-surface);
+  color: var(--verve-text);
+  font: inherit;
+  resize: vertical;
+}
+.field-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.field-pair .field { margin-block: 0; }
+.detail-lines, .history-entry { overflow-wrap: anywhere; }
+.history-entry { padding-block: 8px; border-bottom: 1px solid var(--verve-divider); }
+@media (max-width: 420px) { .field-pair { grid-template-columns: 1fr; } }
+.outcome-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
