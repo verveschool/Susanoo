@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { request, type Membership } from "../lib/workspace";
-import { sendScoutMessage,revokeRelease } from "./operations";
+import { sendScoutMessage, revokeRelease } from "./operations";
 import { SaveButton } from "./form-controls";
 
 export type DirectoryEntry = { id: string; name: string };
@@ -46,7 +46,10 @@ export async function ScoutWorkspace({
           scope,
         token,
       ),
-      request("/rest/v1/scout_stage_totals?select=stage,total" + scope, token),
+      request(
+        "/rest/v1/scout_stage_totals?select=scout_id,stage,total" + scope,
+        token,
+      ),
       scout
         ? request(
             "/rest/v1/scout_messages?select=id,sender_id,body,created_at&scout_id=eq." +
@@ -58,12 +61,18 @@ export async function ScoutWorkspace({
     ]);
   if (!res.ok || !stageResponse.ok || (messageResponse && !messageResponse.ok))
     throw new Error("Scout work unavailable");
-  const stageRows: { stage: string; total: number }[] =
+  const stageRows: { scout_id: string; stage: string; total: number }[] =
     await stageResponse.json();
   const totals = new Map<string, number>();
   for (const row of stageRows)
     totals.set(row.stage, (totals.get(row.stage) ?? 0) + Number(row.total));
   const stages = [...totals.entries()].sort((a, b) => b[1] - a[1]);
+  const scoutTotals = new Map<string, number>();
+  for (const row of stageRows)
+    scoutTotals.set(
+      row.scout_id,
+      (scoutTotals.get(row.scout_id) ?? 0) + Number(row.total),
+    );
   const messages: {
     id: string;
     sender_id: string;
@@ -98,23 +107,6 @@ export async function ScoutWorkspace({
         )}
       </div>
       {notice && <p role="status">{notice}</p>}
-      <section className="section">
-        <div className="section-head">
-          <h2>Pipeline by stage</h2>
-        </div>
-        <div className="card stage-grid">
-          {stages.map(([stage, n]) => (
-            <div key={stage} className="stage-row">
-              <div>
-                <span>{stage}</span>
-                <strong>{n.toLocaleString("en-IN")}</strong>
-              </div>
-              <progress aria-label={stage} value={n} max={submissions || 1} />
-            </div>
-          ))}
-          {!stages.length && <p>No activity recorded yet.</p>}
-        </div>
-      </section>
       {member.role === "executive" && (
         <form className="record-search">
           <input type="hidden" name="view" value="team" />
@@ -161,6 +153,47 @@ export async function ScoutWorkspace({
           <small>Find requirements</small>
         </Link>
       </div>
+      <section className="section">
+        <div className="section-head">
+          <h2>Pipeline by stage</h2>
+        </div>
+        <div className="card stage-grid">
+          {stages.slice(0, 6).map(([stage, n]) => (
+            <Stage key={stage} stage={stage} n={n} total={submissions} />
+          ))}
+          {!stages.length && <p>No activity recorded yet.</p>}
+          {stages.length > 6 && (
+            <details className="more-stages">
+              <summary>View all {stages.length} stages</summary>
+              <div className="stage-grid">
+                {stages.slice(6).map(([stage, n]) => (
+                  <Stage key={stage} stage={stage} n={n} total={submissions} />
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      </section>
+      {!scout && member.role === "executive" && (
+        <section className="section">
+          <div className="section-head">
+            <h2>Scout directory</h2>
+            <span>{scouts.length} scout profiles</span>
+          </div>
+          <div className="scout-directory">
+            {scouts.map((s) => (
+              <Link
+                className="card scout-link"
+                key={s.id}
+                href={"/?view=team&section=overview&scout=" + s.id}
+              >
+                <strong>{s.name}</strong>
+                <small>{scoutTotals.get(s.id) ?? 0} submissions</small>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
       <section className="section">
         <div className="section-head">
           <h2>Recent candidate activity</h2>
@@ -248,6 +281,26 @@ export async function ScoutWorkspace({
         </section>
       )}
     </>
+  );
+}
+
+function Stage({
+  stage,
+  n,
+  total,
+}: {
+  stage: string;
+  n: number;
+  total: number;
+}) {
+  return (
+    <div className="stage-row">
+      <div>
+        <span>{stage}</span>
+        <strong>{n.toLocaleString("en-IN")}</strong>
+      </div>
+      <progress aria-label={stage} value={n} max={total || 1} />
+    </div>
   );
 }
 
@@ -352,7 +405,7 @@ export async function PartnerWorkspace({
                     <th>Candidate</th>
                     <th>Role</th>
                     <th>Stage</th>
-                      {member.role==="executive"&&<th>Access</th>}
+                    {member.role === "executive" && <th>Access</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -361,7 +414,19 @@ export async function PartnerWorkspace({
                       <td data-label="Candidate">{r.candidate_name}</td>
                       <td data-label="Role">{r.requirement}</td>
                       <td data-label="Stage">{r.stage}</td>
-                      {member.role==="executive"&&<td data-label="Access"><form action={revokeRelease}><input type="hidden" name="id" value={r.id}/><input type="hidden" name="partner" value={partner.id}/><button className="outline">Revoke sharing</button></form></td>}
+                      {member.role === "executive" && (
+                        <td data-label="Access">
+                          <form action={revokeRelease}>
+                            <input type="hidden" name="id" value={r.id} />
+                            <input
+                              type="hidden"
+                              name="partner"
+                              value={partner.id}
+                            />
+                            <button className="outline">Revoke sharing</button>
+                          </form>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

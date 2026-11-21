@@ -430,6 +430,13 @@ main > :nth-last-child(2) { margin-bottom: 32px; }
 .chat-thread {display:flex;flex-direction:column;gap:10px;max-height:340px;overflow:auto}
 .chat-thread article {background:var(--verve-elevated);border-radius:12px;padding:10px 14px}
 .chat-thread article p {white-space:pre-wrap;color:var(--verve-text)}
+.more-stages {grid-column:1/-1}
+.more-stages summary {cursor:pointer;color:var(--verve-accent-ink)}
+.more-stages .stage-grid {margin-top:20px}
+.scout-directory {display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.scout-link {display:flex;flex-direction:column;gap:5px;text-decoration:none}
+.scout-link:hover {background:var(--verve-hover)}
+.scout-link small {color:var(--verve-secondary)}
 .restored .page-title {align-items:center}
 .restored .section-head a,.restored .record-dialog a {color:var(--verve-accent-ink)}
 @media (max-width:800px){.restored .sidebar {display:none}.restored .mobile-nav {display:block}.restored .topbar{display:flex}.restored .mobile-nav nav{display:grid;position:absolute;z-index:12;background:var(--verve-surface);padding:12px;border:1px solid var(--verve-divider);border-radius:var(--verve-radius)}.restored .mobile-nav nav a{padding:8px}}
