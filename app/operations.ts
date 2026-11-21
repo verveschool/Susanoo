@@ -133,29 +133,57 @@ export async function sendScoutMessage(form: FormData) {
   redirect(destination + "&notice=" + (res.ok ? "saved" : "failed"));
 }
 
-export async function releaseSubmission(form:FormData){
-  const token=await session();
-  if(!token)redirect("/?notice=expired");
-  const member=await membership(token);
-  if(member?.role!=="executive")redirect("/");
-  const id=String(form.get("id")??"");
-  const destination="/?view=team&section=submissions";
-  if(!/^[\da-f-]{36}$/i.test(id)||form.get("confirm")!=="yes")redirect(destination+"&notice=invalid");
-  const res=await request("/rest/v1/submissions?select=id,display_stage,candidates(name),requirements(title,partner_id)&id=eq."+id,token);
-  if(!res.ok)redirect(destination+"&notice=failed");
-  const [s]=await res.json();
-  if(!s?.candidates?.name||!s?.requirements?.partner_id)redirect(destination+"&notice=invalid");
-  const saved=await request("/rest/v1/partner_releases",token,{submission_id:id,partner_id:s.requirements.partner_id,candidate_name:s.candidates.name,requirement:s.requirements.title,stage:s.display_stage??"Introduced"});
-  redirect(destination+"&notice="+(saved.ok?"saved":saved.status===409?"duplicate":"failed"));
+export async function releaseSubmission(form: FormData) {
+  const token = await session();
+  if (!token) redirect("/?notice=expired");
+  const member = await membership(token);
+  if (member?.role !== "executive") redirect("/");
+  const id = String(form.get("id") ?? "");
+  const destination = "/?view=team&section=submissions";
+  if (!/^[\da-f-]{36}$/i.test(id) || form.get("confirm") !== "yes")
+    redirect(destination + "&notice=invalid");
+  const res = await request(
+    "/rest/v1/submissions?select=id,display_stage,candidates(name),requirements(title,partner_id)&id=eq." +
+      id,
+    token,
+  );
+  if (!res.ok) redirect(destination + "&notice=failed");
+  const [s] = await res.json();
+  if (!s?.candidates?.name || !s?.requirements?.partner_id)
+    redirect(destination + "&notice=invalid");
+  const saved = await request("/rest/v1/partner_releases", token, {
+    submission_id: id,
+    partner_id: s.requirements.partner_id,
+    candidate_name: s.candidates.name,
+    requirement: s.requirements.title,
+    stage: s.display_stage ?? "Introduced",
+  });
+  redirect(
+    destination +
+      "&notice=" +
+      (saved.ok ? "saved" : saved.status === 409 ? "duplicate" : "failed"),
+  );
 }
 
-export async function revokeRelease(form:FormData){
-  const token=await session();
-  if(!token)redirect("/?notice=expired");
-  const member=await membership(token);
-  if(member?.role!=="executive")redirect("/");
-  const id=String(form.get("id")??""),partner=String(form.get("partner")??"");
-  if(!/^[\da-f-]{36}$/i.test(id)||! /^[\da-f-]{36}$/i.test(partner))redirect("/");
-  const res=await request("/rest/v1/partner_releases?id=eq."+id+"&partner_id=eq."+partner,token,undefined,"DELETE");
-  redirect("/?view=partner&section=profiles&partner="+partner+"&notice="+(res.ok?"saved":"failed"));
+export async function revokeRelease(form: FormData) {
+  const token = await session();
+  if (!token) redirect("/?notice=expired");
+  const member = await membership(token);
+  if (member?.role !== "executive") redirect("/");
+  const id = String(form.get("id") ?? ""),
+    partner = String(form.get("partner") ?? "");
+  if (!/^[\da-f-]{36}$/i.test(id) || !/^[\da-f-]{36}$/i.test(partner))
+    redirect("/");
+  const res = await request(
+    "/rest/v1/partner_releases?id=eq." + id + "&partner_id=eq." + partner,
+    token,
+    undefined,
+    "DELETE",
+  );
+  redirect(
+    "/?view=partner&section=profiles&partner=" +
+      partner +
+      "&notice=" +
+      (res.ok ? "saved" : "failed"),
+  );
 }
