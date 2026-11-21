@@ -11,11 +11,13 @@ export async function request(
   token?: string,
   body?: object,
   method = body ? "POST" : "GET",
+  headers: Record<string, string> = {},
 ) {
   return fetch(endpoint + path, {
     method,
     cache: "no-store",
     headers: {
+      ...headers,
       apikey: publishableKey,
       ...(token ? { Authorization: "Bearer " + token } : {}),
       "Content-Type": "application/json",
@@ -44,10 +46,11 @@ export function isSection(key: string): key is Section {
 
 const projections: Record<Section, string> = {
   partners: "id,name",
-  candidates: "id,name",
+  candidates: "id,name,email",
   actions: "id,title,complete",
   requirements: "id,title,partners(name)",
-  submissions: "id,display_stage,candidates(name),requirements(title,partners(name))",
+  submissions:
+    "id,display_stage,source_url,candidates(name),requirements(title,partners(name))",
   interviews:
     "id,scheduled_at,scheduled_on,round_label,submissions(candidates(name),requirements(title,partners(name)))",
   placements:
@@ -59,10 +62,12 @@ type Submission = { candidates: RecordLabel; requirements: Requirement };
 type Row = Partial<Requirement & Submission> & {
   id: string;
   name?: string;
+  email?: string;
   scheduled_at?: string;
   scheduled_on?: string;
   round_label?: string;
   display_stage?: string;
+  source_url?: string;
   joined_on?: string;
   submissions?: Submission;
   complete?: boolean;
@@ -75,23 +80,46 @@ function submissionLabel(submission: Submission) {
   ].join(" · ");
 }
 
-export async function records(table: Section, token: string, page = 0) {
+export async function records(
+  table: Section,
+  token: string,
+  page = 0,
+  query = "",
+  pageSize = 50,
+) {
+  const searchColumn =
+    table === "candidates" || table === "partners" ? "name" : "title";
+  const filter = query
+    ? "&" +
+      searchColumn +
+      "=ilike." +
+      encodeURIComponent("%" + query.replace(/[%_*\\]/g, "\\$&") + "%")
+    : "";
   const res = await request(
     "/rest/v1/" +
       table +
       "?select=" +
       projections[table] +
-      "&order=created_at.desc,id.desc&limit=51&offset=" +
-      page * 50,
+      filter +
+      "&order=created_at.desc,id.desc&limit=" +
+      (pageSize + 1) +
+      "&offset=" +
+      page * pageSize,
     token,
   );
   if (!res.ok) throw new Error("Workspace records could not be loaded");
   const rows: Row[] = await res.json();
   return {
-    more: rows.length > 50,
-    items: rows.slice(0, 50).map((r) => ({
+    more: rows.length > pageSize,
+    items: rows.slice(0, pageSize).map((r) => ({
       id: r.id,
       complete: r.complete,
+      source: r.source_url?.startsWith("https://docs.google.com/spreadsheets/")
+        ? r.source_url
+        : undefined,
+      person: (r.submissions ?? r).candidates?.name,
+      role: (r.submissions ?? r).requirements?.title,
+      partner: (r.submissions ?? r).requirements?.partners?.name,
       label: r.submissions
         ? submissionLabel(r.submissions)
         : r.candidates && r.requirements
@@ -105,9 +133,13 @@ export async function records(table: Section, token: string, page = 0) {
             .toISOString()
             .replace("T", " ")
             .slice(0, 16) + " UTC"
-        : (r.scheduled_on ? [r.round_label, r.scheduled_on].filter(Boolean).join(" · ") : r.display_stage ?? r.joined_on ??
-          r.partners?.name ??
-          (r.complete === undefined ? "" : r.complete ? "Complete" : "Open")),
+        : r.scheduled_on
+          ? [r.round_label, r.scheduled_on].filter(Boolean).join(" · ")
+          : (r.email ??
+            r.display_stage ??
+            r.joined_on ??
+            r.partners?.name ??
+            (r.complete === undefined ? "" : r.complete ? "Complete" : "Open")),
     })),
   };
 }

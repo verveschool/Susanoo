@@ -1,5 +1,9 @@
+import { ChoiceField, SaveButton } from "./form-controls";
+import { RecordTable } from "./record-table";
+import { Shell, href, type View } from "./workspace-shell";
+import { Overview } from "./overview";
 import { randomUUID } from "node:crypto";
-import { completeAction, save, signIn, signOut } from "./operations";
+import { save, signIn, signOut } from "./operations";
 import {
   isSection,
   records,
@@ -45,10 +49,15 @@ export default async function Home({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const section =
-    typeof params.section === "string" && isSection(params.section)
-      ? params.section
-      : "requirements";
+  const key = typeof params.section === "string" ? params.section : "overview";
+  const view: View =
+    params.view === "partner"
+      ? "partner"
+      : params.view === "team" ||
+          (!params.view &&
+            ["candidates", "submissions", "interviews"].includes(key))
+        ? "team"
+        : "executive";
   const notice =
     typeof params.notice === "string" ? notices[params.notice] : "";
   const token = await session();
@@ -80,7 +89,7 @@ export default async function Home({
                 required
               />
             </label>
-            <button className="primary">Sign in</button>
+            <button className="verve-primary primary">Sign in</button>
           </form>
           <p role="status">{notice}</p>
         </section>
@@ -100,18 +109,69 @@ export default async function Home({
         </section>
       </main>
     );
+  if (
+    view === "partner" ||
+    ["finance", "collections", "readiness", "earnings"].includes(key)
+  ) {
+    const info: Record<string, [string, string]> = {
+      partner: [
+        "Partner workspace",
+        "Partner access is pending. Candidate profiles can be shared here once release permissions are connected.",
+      ],
+      finance: [
+        "Finance",
+        "Fee and invoice records have not been reconciled with the workspace yet.",
+      ],
+      collections: [
+        "Collections",
+        "Receipt allocations are pending reconciliation.",
+      ],
+      earnings: ["My earnings", "Verified commission records are pending."],
+      readiness: [
+        "Rules & readiness",
+        "Internal hiring records are connected. Partner releases, invoice posting and commission calculations are pending.",
+      ],
+    };
+    const [title, body] = info[view === "partner" ? "partner" : key];
+    return (
+      <Shell view={view} section={key}>
+        <div className="page-title">
+          <h1>{title}</h1>
+        </div>
+        <p className="notice">{body}</p>
+      </Shell>
+    );
+  }
+  if (!isSection(key))
+    return (
+      <Shell view={view} section="overview">
+        <Overview view={view} token={token} />
+      </Shell>
+    );
+  const section = key;
+  const adding = params.add === "1";
   const page = Math.max(
     0,
     Math.min(1000000, Math.floor(Number(params.page) || 0)),
   );
+  const searchable = [
+    "candidates",
+    "partners",
+    "requirements",
+    "actions",
+  ].includes(section);
+  const query =
+    searchable && typeof params.q === "string"
+      ? params.q.trim().slice(0, 150)
+      : "";
   const [list, choices] = await Promise.all([
-    records(section, token, page),
+    records(section, token, page, query),
     Promise.all(
-      (dependencies[section] ?? []).map(async (table) => {
+      (adding ? (dependencies[section] ?? []) : []).map(async (table) => {
         const options = [];
         let next = 0;
         while (true) {
-          const result = await records(table, token, next++);
+          const result = await records(table, token, next++, "", 500);
           options.push(...result.items);
           if (!result.more) break;
         }
@@ -119,132 +179,163 @@ export default async function Home({
       }),
     ),
   ]);
+  const linked = ["submissions", "interviews", "placements"].includes(section);
+  const headers = linked
+    ? [
+        "Candidate",
+        "Role",
+        "Partner",
+        section === "submissions"
+          ? "Stage"
+          : section === "placements"
+            ? "Joining date"
+            : "Interview",
+      ]
+    : section === "requirements"
+      ? ["Role", "Partner"]
+      : section === "actions"
+        ? ["Action", "Status"]
+        : section === "candidates"
+          ? ["Candidate", "Email"]
+          : ["Name"];
   const ready = choices.every((c) => c.options.length > 0);
   return (
-    <div className="shell">
-      <a className="skip-link" href="#content">
-        Skip to records
-      </a>
-      <div className="body">
-        <header className="topbar">
-          <strong className="brand">VerveSchool Workspace</strong>
-          <form action={signOut}>
-            <button className="outline">Sign out</button>
-          </form>
-        </header>
-        <main id="content">
-          <nav className="workspace-nav" aria-label="Workspace">
-            {(Object.keys(sections) as Section[]).map((s) => (
-              <a
-                key={s}
-                href={"/?section=" + s}
-                aria-current={s === section ? "page" : undefined}
-              >
-                {sections[s]}
-              </a>
-            ))}
-          </nav>
-          <div className="page-title">
-            <h1>{sections[section]}</h1>
-          </div>
-          <p role="status">{notice}</p>
-          <section className="card">
-            <h2>Add {singular[section]}</h2>
-            {!ready ? (
-              <p>
-                First add{" "}
-                {choices
-                  .filter((c) => !c.options.length)
-                  .map((c) => singular[c.table])
-                  .join(" and ")}
-                .
-              </p>
-            ) : (
-              <form action={save}>
-                <input type="hidden" name="section" value={section} />
-                <input type="hidden" name="request_id" value={randomUUID()} />
-                {["partners", "candidates", "requirements", "actions"].includes(
-                  section,
-                ) && (
-                  <label className="field">
-                    {section === "partners" || section === "candidates"
-                      ? "Name"
-                      : "Title"}
-                    <input
-                      name={
-                        section === "partners" || section === "candidates"
-                          ? "name"
-                          : "title"
-                      }
-                      required
-                      maxLength={200}
-                    />
-                  </label>
-                )}
-                {choices.map(({ table, options }) => (
-                  <label key={table} className="field">
-                    {singular[table]}
-                    <select name={fieldNames[table]} defaultValue="" required>
-                      <option value="" disabled>
-                        Select {singular[table]}
-                      </option>
-                      {options.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.label}
-                          {o.detail ? " · " + o.detail : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ))}
-                {section === "interviews" && (
-                  <label className="field">
-                    Scheduled time (UTC)
-                    <input type="datetime-local" name="scheduled_at" required />
-                  </label>
-                )}
-                {section === "placements" && (
-                  <label className="field">
-                    Joining date
-                    <input type="date" name="joined_on" required />
-                  </label>
-                )}
-                <button className="primary">Save {singular[section]}</button>
-              </form>
-            )}
-          </section>
-          <section className="section" aria-label={sections[section]}>
-            {!list.items.length ? (
-              <p>No {sections[section].toLowerCase()} on this page.</p>
-            ) : (
-              <ul className="record-list">
-                {list.items.map((row) => (
-                  <li className="card" key={row.id}>
-                    <strong>{row.label}</strong>
-                    {row.detail && <p>{row.detail}</p>}
-                    {section === "actions" && !row.complete && (
-                      <form action={completeAction}>
-                        <input type="hidden" name="id" value={row.id} />
-                        <button className="outline">Mark complete</button>
-                      </form>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {page > 0 && (
-              <a href={"/?section=" + section + "&page=" + (page - 1)}>
-                Previous page{" "}
-              </a>
-            )}
-            {list.more && (
-              <a href={"/?section=" + section + "&page=" + (page + 1)}>
-                Next page
-              </a>
-            )}
-          </section>
-        </main>
+    <Shell view={view} section={section}>
+      <div className="page-title">
+        <h1>{sections[section]}</h1>
+        <a
+          className="verve-primary primary"
+          href={href(view, section) + (adding ? "" : "&add=1")}
+        >
+          {adding ? "Close form" : "Add " + singular[section]}
+        </a>
       </div>
-    </div>
+      <p role="status">{notice}</p>
+      {adding && (
+        <section className="card">
+          <h2>Add {singular[section]}</h2>
+          {!ready ? (
+            <p>
+              First add{" "}
+              {choices
+                .filter((c) => !c.options.length)
+                .map((c) => singular[c.table])
+                .join(" and ")}
+              .
+            </p>
+          ) : (
+            <form action={save}>
+              <input type="hidden" name="section" value={section} />
+              <input type="hidden" name="view" value={view} />
+              <input type="hidden" name="request_id" value={randomUUID()} />
+              {["partners", "candidates", "requirements", "actions"].includes(
+                section,
+              ) && (
+                <label className="field">
+                  {section === "partners" || section === "candidates"
+                    ? "Name"
+                    : "Title"}
+                  <input
+                    name={
+                      section === "partners" || section === "candidates"
+                        ? "name"
+                        : "title"
+                    }
+                    required
+                    maxLength={200}
+                  />
+                </label>
+              )}
+              {choices.map(({ table, options }) => (
+                <ChoiceField
+                  key={table}
+                  name={fieldNames[table]!}
+                  label={singular[table]}
+                  options={options}
+                />
+              ))}
+              {section === "interviews" && (
+                <label className="field">
+                  Scheduled time (UTC)
+                  <input type="datetime-local" name="scheduled_at" required />
+                </label>
+              )}
+              {section === "placements" && (
+                <label className="field">
+                  Joining date
+                  <input type="date" name="joined_on" required />
+                </label>
+              )}
+              <SaveButton>{"Save " + singular[section]}</SaveButton>
+            </form>
+          )}
+        </section>
+      )}
+      <section className="section" aria-label={sections[section]}>
+        {searchable && (
+          <form className="record-search" role="search">
+            <input type="hidden" name="view" value={view} />
+            <input type="hidden" name="section" value={section} />
+            <input
+              type="search"
+              name="q"
+              aria-label={"Search all " + sections[section]}
+              defaultValue={query}
+              placeholder={"Search all " + sections[section].toLowerCase()}
+            />
+            <button className="outline">Search</button>
+            {query && <a href={href(view, section)}>Clear</a>}
+          </form>
+        )}
+        {!list.items.length ? (
+          <p>
+            {query
+              ? "No matches for “" + query + "”."
+              : "No " + sections[section].toLowerCase() + " on this page."}
+          </p>
+        ) : (
+          <RecordTable
+            view={view}
+            filterPage={!searchable}
+            headers={headers}
+            rows={list.items.map((row) => ({
+              id: row.id,
+              source: row.source,
+              openAction: section === "actions" && !row.complete,
+              cells: (linked
+                ? [row.person, row.role, row.partner, row.detail]
+                : [row.label, ...(headers.length > 1 ? [row.detail] : [])]
+              ).map((v) => v ?? ""),
+            }))}
+          />
+        )}
+        {page > 0 && (
+          <a
+            href={
+              href(view, section) +
+              "&q=" +
+              encodeURIComponent(query) +
+              "&page=" +
+              (page - 1)
+            }
+          >
+            Previous page{" "}
+          </a>
+        )}
+        {list.more && (
+          <a
+            href={
+              href(view, section) +
+              "&q=" +
+              encodeURIComponent(query) +
+              "&page=" +
+              (page + 1)
+            }
+          >
+            Next page
+          </a>
+        )}
+      </section>
+    </Shell>
   );
 }
