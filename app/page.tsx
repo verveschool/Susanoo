@@ -2,6 +2,7 @@ import { ChoiceField, SaveButton } from "./form-controls";
 import { RecordTable } from "./record-table";
 import { Shell, href, type View } from "./workspace-shell";
 import { Overview } from "./overview";
+import {Calendar} from "./calendar";
 import { directory, ScoutWorkspace, PartnerWorkspace } from "./role-views";
 import { randomUUID } from "node:crypto";
 import { save, signIn, signOut } from "./operations";
@@ -152,6 +153,7 @@ export default async function Home({
         />
       </Shell>
     );
+  if(key==="calendar") return <Shell view={view} section="calendar" member={member}><Calendar token={token} view={view} month={typeof params.month==="string"?params.month:undefined}/></Shell>;
   if (
     member.role === "scout" &&
     ["partners", "finance", "collections", "readiness"].includes(key)
@@ -348,7 +350,7 @@ export default async function Home({
               )}
               {section === "interviews" && (
                 <label className="field">
-                  Scheduled time (UTC)
+                  Scheduled time (India)
                   <input type="datetime-local" name="scheduled_at" required />
                 </label>
               )}

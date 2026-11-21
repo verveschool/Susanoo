@@ -79,7 +79,10 @@ export async function save(form: FormData) {
   for (const field of fields) {
     const value = String(form.get(field) ?? "").trim();
     if (!value) redirect(destination + "&add=1&notice=invalid");
-    values[field] = field === "scheduled_at" ? value + "Z" : value;
+    if(field==="scheduled_at"){
+      if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)||Number.isNaN(Date.parse(value+":00+05:30")))redirect(destination+"&add=1&notice=invalid");
+      values[field]=new Date(value+":00+05:30").toISOString();
+    } else values[field]=value;
   }
   const res = await request("/rest/v1/" + table, token, values);
   redirect(

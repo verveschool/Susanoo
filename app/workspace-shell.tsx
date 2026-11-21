@@ -10,6 +10,7 @@ const menus = {
     "actions",
     "partners",
     "requirements",
+    "calendar",
     "placements",
     "finance",
     "collections",
@@ -22,6 +23,7 @@ const menus = {
     "requirements",
     "submissions",
     "interviews",
+    "calendar",
     "placements",
     "earnings",
   ],
@@ -35,6 +37,7 @@ const labels: Record<string, string> = {
   readiness: "Rules & readiness",
   earnings: "My earnings",
   profiles: "Shared candidates",
+  calendar: "Calendar",
 };
 export function href(view: View, section: string) {
   return "/?view=" + view + "&section=" + section;

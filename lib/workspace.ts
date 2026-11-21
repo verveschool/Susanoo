@@ -147,10 +147,7 @@ export async function records(
             })
           : (r.name ?? r.title ?? ""),
       detail: r.scheduled_at
-        ? new Date(r.scheduled_at)
-            .toISOString()
-            .replace("T", " ")
-            .slice(0, 16) + " UTC"
+        ? new Intl.DateTimeFormat("en-IN",{dateStyle:"medium",timeStyle:"short",timeZone:"Asia/Kolkata"}).format(new Date(r.scheduled_at))+" IST"
         : r.scheduled_on
           ? [r.round_label, r.scheduled_on].filter(Boolean).join(" · ")
           : (r.email ??
