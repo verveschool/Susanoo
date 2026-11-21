@@ -1,12 +1,13 @@
 "use client";
 import { useRef, useState } from "react";
-import { completeAction } from "./operations";
+import { completeAction,releaseSubmission } from "./operations";
 
 type Item = {
   id: string;
   cells: string[];
   source?: string;
   openAction: boolean;
+  canRelease?:boolean;
 };
 export function RecordTable({
   headers,
@@ -103,6 +104,7 @@ export function RecordTable({
                 Open source tracker
               </a>
             )}
+            {selected.canRelease&&<form action={releaseSubmission} className="field"><input type="hidden" name="id" value={selected.id}/><label><input type="checkbox" required name="confirm" value="yes"/> Share this candidate name, role and stage with {selected.cells[2]}.</label><button className="outline">Share with partner</button></form>}
             {selected.openAction && (
               <form action={completeAction}>
                 <input type="hidden" name="view" value={view} />

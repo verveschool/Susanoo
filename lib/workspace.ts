@@ -30,6 +30,20 @@ export async function session() {
   return (await cookies()).get(sessionCookie)?.value;
 }
 
+export type Membership = {
+  role: "executive" | "scout" | "partner";
+  scout_id: string | null;
+  partner_id: string | null;
+};
+export async function membership(token: string): Promise<Membership | null> {
+  const res = await request(
+    "/rest/v1/workspace_members?select=role,scout_id,partner_id&limit=1",
+    token,
+  );
+  if (!res.ok) return null;
+  return (await res.json())[0] ?? null;
+}
+
 export const sections = {
   partners: "Partners",
   requirements: "Requirements",
@@ -50,7 +64,7 @@ const projections: Record<Section, string> = {
   actions: "id,title,complete",
   requirements: "id,title,partners(name)",
   submissions:
-    "id,display_stage,source_url,candidates(name),requirements(title,partners(name))",
+    "id,display_stage,source_url,scouts(name),candidates(name),requirements(title,partners(name))",
   interviews:
     "id,scheduled_at,scheduled_on,round_label,submissions(candidates(name),requirements(title,partners(name)))",
   placements:
@@ -68,6 +82,7 @@ type Row = Partial<Requirement & Submission> & {
   round_label?: string;
   display_stage?: string;
   source_url?: string;
+  scouts?: RecordLabel;
   joined_on?: string;
   submissions?: Submission;
   complete?: boolean;
@@ -86,6 +101,7 @@ export async function records(
   page = 0,
   query = "",
   pageSize = 50,
+  scoutFilter = "",
 ) {
   const searchColumn =
     table === "candidates" || table === "partners" ? "name" : "title";
@@ -101,6 +117,7 @@ export async function records(
       "?select=" +
       projections[table] +
       filter +
+      (scoutFilter ? "&scout_id=eq." + encodeURIComponent(scoutFilter) : "") +
       "&order=created_at.desc,id.desc&limit=" +
       (pageSize + 1) +
       "&offset=" +
@@ -114,6 +131,7 @@ export async function records(
     items: rows.slice(0, pageSize).map((r) => ({
       id: r.id,
       complete: r.complete,
+      scout: r.scouts?.name,
       source: r.source_url?.startsWith("https://docs.google.com/spreadsheets/")
         ? r.source_url
         : undefined,
