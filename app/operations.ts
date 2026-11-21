@@ -44,16 +44,21 @@ export async function save(form: FormData) {
     placements: ["submission_id", "joined_on"],
     actions: ["title"],
   }[table];
+  const destination =
+    "/?view=" +
+    (form.get("view") === "team" ? "team" : "executive") +
+    "&section=" +
+    table;
   const values: Record<string, string> = { id: String(form.get("request_id")) };
   for (const field of fields) {
     const value = String(form.get(field) ?? "").trim();
-    if (!value) redirect("/?section=" + table + "&notice=invalid");
+    if (!value) redirect(destination + "&add=1&notice=invalid");
     values[field] = field === "scheduled_at" ? value + "Z" : value;
   }
   const res = await request("/rest/v1/" + table, token, values);
   redirect(
-    "/?section=" +
-      table +
+    destination +
+      (res.ok ? "" : "&add=1") +
       "&notice=" +
       (res.ok
         ? "saved"
@@ -76,5 +81,10 @@ export async function completeAction(form: FormData) {
     { complete: true },
     "PATCH",
   );
-  redirect("/?section=actions&notice=" + (res.ok ? "saved" : "failed"));
+  redirect(
+    "/?view=" +
+      (form.get("view") === "team" ? "team" : "executive") +
+      "&section=actions&notice=" +
+      (res.ok ? "saved" : "failed"),
+  );
 }
