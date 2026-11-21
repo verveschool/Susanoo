@@ -380,3 +380,9 @@ main > :nth-last-child(2) { margin-bottom: 32px; }
 .history-entry { padding-block: 8px; border-bottom: 1px solid var(--verve-divider); }
 @media (max-width: 420px) { .field-pair { grid-template-columns: 1fr; } }
 .outcome-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.entry { max-width: 30rem; margin: 10vh auto; }
+.workspace-nav { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
+.workspace-nav a { padding-block: .5rem; color: inherit; }
+.workspace-nav a[aria-current] { font-weight: 700; }
+.record-list { display: grid; gap: .75rem; list-style: none; padding: 0; }

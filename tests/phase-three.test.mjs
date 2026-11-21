@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { OperationalStore } from '../lib/operational-store.mjs';
-import { money } from '../lib/demo.mjs';
+import { money } from '../lib/money.mjs';
 
 const scout = { id:'scout', role:'talent_ops' };
 const finance = { id:'finance', role:'finance' };

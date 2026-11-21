@@ -3,8 +3,8 @@ import { product } from '../lib/product';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: product.demoName,
-  description: 'Operational design demo using synthetic records only.',
+  title: product.workspaceName,
+  description: 'Private hiring operations for VerveSchool.',
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
