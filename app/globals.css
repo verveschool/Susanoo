@@ -437,6 +437,18 @@ main > :nth-last-child(2) { margin-bottom: 32px; }
 .scout-link {display:flex;flex-direction:column;gap:5px;text-decoration:none}
 .scout-link:hover {background:var(--verve-hover)}
 .scout-link small {color:var(--verve-secondary)}
+.calendar-controls {display:flex;align-items:center;gap:14px;margin-bottom:20px}
+.calendar-controls h2 {min-width:150px;text-align:center}
+.calendar-controls a {text-decoration:none}
+.calendar-grid {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.calendar-grid>strong {color:var(--verve-secondary);font-size:.75rem;padding:8px}
+.calendar-day {min-height:76px;padding:8px;border:1px solid var(--verve-divider);border-radius:8px;text-decoration:none;display:flex;flex-direction:column;gap:5px}
+.calendar-day.today {border-color:var(--verve-accent-ink)}
+.calendar-day small {color:var(--verve-accent-ink)}
+.calendar-group {margin-top:22px;scroll-margin-top:20px}
+.calendar-group h3 {font-size:1rem}
+.calendar-event {display:flex;gap:24px;align-items:baseline;margin:8px 0}
+@media(max-width:620px){.calendar-day {min-height:54px;padding:4px;font-size:.8rem}.calendar-day small {font-size:.6rem}.calendar-controls {gap:6px}.calendar-controls h2{min-width:120px;font-size:1rem}}
 .restored .page-title {align-items:center}
 .restored .section-head a,.restored .record-dialog a {color:var(--verve-accent-ink)}
 @media (max-width:800px){.restored .sidebar {display:none}.restored .mobile-nav {display:block}.restored .topbar{display:flex}.restored .mobile-nav nav{display:grid;position:absolute;z-index:12;background:var(--verve-surface);padding:12px;border:1px solid var(--verve-divider);border-radius:var(--verve-radius)}.restored .mobile-nav nav a{padding:8px}}
