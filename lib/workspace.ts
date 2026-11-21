@@ -47,7 +47,7 @@ const projections: Record<Section, string> = {
   candidates: "id,name",
   actions: "id,title,complete",
   requirements: "id,title,partners(name)",
-  submissions: "id,source_stage,candidates(name),requirements(title,partners(name))",
+  submissions: "id,display_stage,candidates(name),requirements(title,partners(name))",
   interviews:
     "id,scheduled_at,scheduled_on,round_label,submissions(candidates(name),requirements(title,partners(name)))",
   placements:
@@ -62,7 +62,7 @@ type Row = Partial<Requirement & Submission> & {
   scheduled_at?: string;
   scheduled_on?: string;
   round_label?: string;
-  source_stage?: string;
+  display_stage?: string;
   joined_on?: string;
   submissions?: Submission;
   complete?: boolean;
@@ -105,7 +105,7 @@ export async function records(table: Section, token: string, page = 0) {
             .toISOString()
             .replace("T", " ")
             .slice(0, 16) + " UTC"
-        : (r.scheduled_on ? [r.round_label, r.scheduled_on].filter(Boolean).join(" · ") : r.source_stage ?? r.joined_on ??
+        : (r.scheduled_on ? [r.round_label, r.scheduled_on].filter(Boolean).join(" · ") : r.display_stage ?? r.joined_on ??
           r.partners?.name ??
           (r.complete === undefined ? "" : r.complete ? "Complete" : "Open")),
     })),

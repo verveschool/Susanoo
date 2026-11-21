@@ -1,0 +1,35 @@
+create function public.workspace_stage_label(raw text) returns text language sql immutable strict set search_path = '' as $$
+  select case lower(regexp_replace(trim(regexp_replace(raw,'^[^[:alnum:]]+','','g')), '[[:space:]]+', ' ', 'g'))
+      when 'dnp' then 'DNP'
+      when 'not selected' then 'Not selected'
+      when 'rejected in screening call' then 'Rejected during screening call'
+      when 'not interested' then 'Not interested'
+      when 'reject' then 'Rejected'
+      when 'select' then 'Selected'
+      when 'dropped' then 'Dropped'
+      when 'no show' then 'No show'
+      when 'rejected' then 'Rejected'
+      when 'shortlisted for final round' then 'Shortlisted for the final round'
+      when 'followup required' then 'Follow up required'
+      when 'not attended the interview' then 'Did not attend the interview'
+      when 'duplicate' then 'Duplicate'
+      when 'r1 scheduled' then 'Round 1 scheduled'
+      when 'r1 sched' then 'Round 1 scheduled'
+      when 'selected' then 'Selected'
+      when 'on- hold' then 'On hold'
+      when 'on hold' then 'On hold'
+      when 'joined' then 'Joined'
+      when 'ready' then 'Ready'
+      when 'r1 select' then 'Selected in round 1'
+      when 'hr rd' then 'HR round'
+      when 'hire' then 'Hire'
+      when 'adhoc' then 'Ad hoc'
+      when 'ad-hoc' then 'Ad hoc'
+      when 'ad hoc' then 'Ad hoc'
+      when 'ad-hoc final interview' then 'Ad hoc final interview'
+      when 'ad-hoc personal interview' then 'Ad hoc personal interview'
+      when 'parameter reject' then 'Parameter rejection'
+      else case when raw ~ 'o=o=' then 'Needs review' else trim(regexp_replace(raw,'[[:space:]]+',' ','g')) end
+  end
+$$;
+alter table public.submissions add column display_stage text generated always as (public.workspace_stage_label(source_stage)) stored;
