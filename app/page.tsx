@@ -2,6 +2,7 @@ import { ChoiceField, SaveButton } from "./form-controls";
 import { RecordTable } from "./record-table";
 import { Shell, href, type View } from "./workspace-shell";
 import { Overview } from "./overview";
+import { directory, ScoutWorkspace, PartnerWorkspace } from "./role-views";
 import { randomUUID } from "node:crypto";
 import { save, signIn, signOut } from "./operations";
 import {
@@ -11,6 +12,7 @@ import {
   sections,
   session,
   type Section,
+  type Membership,
 } from "../lib/workspace";
 
 const notices: Record<string, string> = {
@@ -50,7 +52,7 @@ export default async function Home({
 }) {
   const params = await searchParams;
   const key = typeof params.section === "string" ? params.section : "overview";
-  const view: View =
+  let view: View =
     params.view === "partner"
       ? "partner"
       : params.view === "team" ||
@@ -62,7 +64,10 @@ export default async function Home({
     typeof params.notice === "string" ? notices[params.notice] : "";
   const token = await session();
   const access = token
-    ? await request("/rest/v1/workspace_members?select=user_id&limit=1", token)
+    ? await request(
+        "/rest/v1/workspace_members?select=role,scout_id,partner_id&limit=1",
+        token,
+      )
     : null;
   if (!token || access?.status === 401)
     return (
@@ -96,7 +101,7 @@ export default async function Home({
       </main>
     );
   if (!access?.ok) throw new Error("Workspace connection unavailable");
-  const members = await access.json();
+  const members: Membership[] = await access.json();
   if (!members.length)
     return (
       <main>
@@ -109,10 +114,54 @@ export default async function Home({
         </section>
       </main>
     );
+  const member = members[0];
+  if (member.role === "scout") view = "team";
+  if (member.role === "partner") view = "partner";
+  if (view === "partner") {
+    if (member.role === "scout") view = "team";
+    else
+      return (
+        <Shell
+          view="partner"
+          section={key}
+          member={member}
+          partner={
+            member.partner_id ??
+            (typeof params.partner === "string" ? params.partner : undefined)
+          }
+        >
+          <PartnerWorkspace
+            token={token}
+            member={member}
+            selected={
+              typeof params.partner === "string" ? params.partner : undefined
+            }
+            section={key}
+          />
+        </Shell>
+      );
+  }
+  if (view === "team" && key === "overview")
+    return (
+      <Shell view={view} section="overview" member={member}>
+        <ScoutWorkspace
+          token={token}
+          member={member}
+          notice={notice}
+          selected={typeof params.scout === "string" ? params.scout : undefined}
+        />
+      </Shell>
+    );
   if (
-    view === "partner" ||
-    ["finance", "collections", "readiness", "earnings"].includes(key)
-  ) {
+    member.role === "scout" &&
+    ["partners", "finance", "collections", "readiness"].includes(key)
+  )
+    return (
+      <Shell view="team" section="overview" member={member}>
+        <ScoutWorkspace token={token} member={member} />
+      </Shell>
+    );
+  if (["finance", "collections", "readiness", "earnings"].includes(key)) {
     const info: Record<string, [string, string]> = {
       partner: [
         "Partner workspace",
@@ -132,9 +181,9 @@ export default async function Home({
         "Internal hiring records are connected. Partner releases, invoice posting and commission calculations are pending.",
       ],
     };
-    const [title, body] = info[view === "partner" ? "partner" : key];
+    const [title, body] = info[key];
     return (
-      <Shell view={view} section={key}>
+      <Shell view={view} section={key} member={member}>
         <div className="page-title">
           <h1>{title}</h1>
         </div>
@@ -144,12 +193,29 @@ export default async function Home({
   }
   if (!isSection(key))
     return (
-      <Shell view={view} section="overview">
+      <Shell view={view} section="overview" member={member}>
         <Overview view={view} token={token} />
       </Shell>
     );
   const section = key;
-  const adding = params.add === "1";
+  const scoutFilter =
+    member.role === "executive" &&
+    view === "team" &&
+    ["submissions", "actions"].includes(section) &&
+    typeof params.scout === "string" &&
+    /^[0-9a-f-]{36}$/i.test(params.scout)
+      ? params.scout
+      : "";
+  const canAdd =
+    member.role === "executive" ||
+    ["candidates", "submissions", "interviews", "actions"].includes(section);
+  const adding = canAdd && params.add === "1";
+  const scoutOptions =
+    adding &&
+    member.role === "executive" &&
+    ["candidates", "submissions", "actions"].includes(section)
+      ? await directory(token, "scouts")
+      : [];
   const page = Math.max(
     0,
     Math.min(1000000, Math.floor(Number(params.page) || 0)),
@@ -165,7 +231,7 @@ export default async function Home({
       ? params.q.trim().slice(0, 150)
       : "";
   const [list, choices] = await Promise.all([
-    records(section, token, page, query),
+    records(section, token, page, query, 50, scoutFilter),
     Promise.all(
       (adding ? (dependencies[section] ?? []) : []).map(async (table) => {
         const options = [];
@@ -190,6 +256,7 @@ export default async function Home({
           : section === "placements"
             ? "Joining date"
             : "Interview",
+        ...(section === "submissions" ? ["Scout"] : []),
       ]
     : section === "requirements"
       ? ["Role", "Partner"]
@@ -200,15 +267,21 @@ export default async function Home({
           : ["Name"];
   const ready = choices.every((c) => c.options.length > 0);
   return (
-    <Shell view={view} section={section}>
+    <Shell view={view} section={section} member={member}>
       <div className="page-title">
         <h1>{sections[section]}</h1>
-        <a
-          className="verve-primary primary"
-          href={href(view, section) + (adding ? "" : "&add=1")}
-        >
-          {adding ? "Close form" : "Add " + singular[section]}
-        </a>
+        {canAdd && (
+          <a
+            className="verve-primary primary"
+            href={
+              href(view, section) +
+              (scoutFilter ? "&scout=" + scoutFilter : "") +
+              (adding ? "" : "&add=1")
+            }
+          >
+            {adding ? "Close form" : "Add " + singular[section]}
+          </a>
+        )}
       </div>
       <p role="status">{notice}</p>
       {adding && (
@@ -254,6 +327,25 @@ export default async function Home({
                   options={options}
                 />
               ))}
+              {section === "candidates" && (
+                <label className="field">
+                  Email (optional)
+                  <input type="email" name="email" />
+                </label>
+              )}
+              {scoutOptions.length > 0 && (
+                <label className="field">
+                  Assigned scout
+                  <select name="scout_id" defaultValue={scoutFilter}>
+                    <option value="">Unassigned</option>
+                    {scoutOptions.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               {section === "interviews" && (
                 <label className="field">
                   Scheduled time (UTC)
@@ -274,6 +366,7 @@ export default async function Home({
       <section className="section" aria-label={sections[section]}>
         {searchable && (
           <form className="record-search" role="search">
+            <input type="hidden" name="scout" value={scoutFilter} />
             <input type="hidden" name="view" value={view} />
             <input type="hidden" name="section" value={section} />
             <input
@@ -284,7 +377,16 @@ export default async function Home({
               placeholder={"Search all " + sections[section].toLowerCase()}
             />
             <button className="outline">Search</button>
-            {query && <a href={href(view, section)}>Clear</a>}
+            {query && (
+              <a
+                href={
+                  href(view, section) +
+                  (scoutFilter ? "&scout=" + scoutFilter : "")
+                }
+              >
+                Clear
+              </a>
+            )}
           </form>
         )}
         {!list.items.length ? (
@@ -302,8 +404,15 @@ export default async function Home({
               id: row.id,
               source: row.source,
               openAction: section === "actions" && !row.complete,
+              canRelease:section==="submissions"&&member.role==="executive",
               cells: (linked
-                ? [row.person, row.role, row.partner, row.detail]
+                ? [
+                    row.person,
+                    row.role,
+                    row.partner,
+                    row.detail,
+                    ...(section === "submissions" ? [row.scout] : []),
+                  ]
                 : [row.label, ...(headers.length > 1 ? [row.detail] : [])]
               ).map((v) => v ?? ""),
             }))}
@@ -313,6 +422,7 @@ export default async function Home({
           <a
             href={
               href(view, section) +
+              (scoutFilter ? "&scout=" + scoutFilter : "") +
               "&q=" +
               encodeURIComponent(query) +
               "&page=" +
@@ -326,6 +436,7 @@ export default async function Home({
           <a
             href={
               href(view, section) +
+              (scoutFilter ? "&scout=" + scoutFilter : "") +
               "&q=" +
               encodeURIComponent(query) +
               "&page=" +
