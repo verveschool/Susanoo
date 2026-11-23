@@ -2,6 +2,15 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { sections, type Membership } from "../lib/workspace";
 import { signOut } from "./operations";
+import { LayoutDashboard, CheckSquare, Building2, BriefcaseBusiness, UsersRound, FileText, CalendarDays, UserCheck, Wallet, Receipt, ShieldCheck, LogOut, PanelLeft, ChevronRight } from "lucide-react";
+
+const icons: Record<string, typeof LayoutDashboard> = {
+  overview: LayoutDashboard, actions: CheckSquare, partners: Building2,
+  requirements: BriefcaseBusiness, candidates: UsersRound, submissions: FileText,
+  interviews: UserCheck, calendar: CalendarDays, placements: UserCheck,
+  finance: Wallet, collections: Receipt, readiness: ShieldCheck,
+  earnings: Wallet, profiles: UsersRound,
+};
 
 export type View = "executive" | "team" | "partner";
 const menus = {
@@ -67,7 +76,8 @@ export function Shell({
           : "")
       }
     >
-      {view === "team" && key === "overview" ? "My work" : labels[key]}
+      {(() => { const Icon = icons[key]; return <Icon size={18} strokeWidth={1.75} aria-hidden="true"/>; })()}
+      <span>{view === "team" && key === "overview" ? "My work" : labels[key]}</span>
     </Link>
   ));
   return (
@@ -76,15 +86,16 @@ export function Shell({
         Skip to content
       </a>
       <aside className="sidebar">
-        <div className="brand">VerveSchool</div>
+        <div className="brand"><img className="brand-mark" src="/icon.png" width={36} height={36} alt=""/><span>verveschool<small>workspace</small></span></div>
         <nav aria-label="Workspace navigation">{navigation}</nav>
       </aside>
       <div className="body">
         <header className="topbar">
           <details className="mobile-nav">
-            <summary>Menu</summary>
+            <summary aria-label="Open navigation"><PanelLeft size={21} strokeWidth={1.8} aria-hidden="true"/></summary>
             <nav>{navigation}</nav>
           </details>
+          <div className="workspace-location"><span>Workspace</span><ChevronRight size={14} aria-hidden="true"/><strong>{labels[section] ?? "Overview"}</strong></div>
           <nav className="workspace-switch" aria-label="Workspace views">
             {(["executive", "team", "partner"] as const)
               .filter((v) => member.role === "executive" || v === view)
@@ -107,7 +118,7 @@ export function Shell({
               ))}
           </nav>
           <form className="account" action={signOut}>
-            <button className="outline">Sign out</button>
+            <button className="outline" aria-label="Sign out"><LogOut size={16} strokeWidth={1.8} aria-hidden="true"/><span>Sign out</span></button>
           </form>
         </header>
         <main id="content">{children}</main>
@@ -124,7 +135,8 @@ export function Shell({
               key={key}
               aria-current={section === key ? "page" : undefined}
             >
-              {key === "overview" ? "Home" : labels[key]}
+              {(() => { const Icon = icons[key]; return <Icon size={20} strokeWidth={1.8} aria-hidden="true"/>; })()}
+              <span>{key === "overview" ? "Home" : labels[key]}</span>
             </Link>
           ))}
         </nav>
